@@ -36,7 +36,12 @@
 		component: './RandomUser',
 		icon: 'ArrowsAltOutlined',
 	},
-
+	
+	{
+		path: '/application', 
+		name: 'Quản lý đơn đăng ký', 
+		component: '@/pages/application/index',
+	},	
 	// DANH MUC HE THONG
 	// {
 	// 	name: 'DanhMuc',
