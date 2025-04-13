@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { useModel } from 'umi';
-import { Table, Button, Popconfirm, Space, Tag, message, Modal } from 'antd';
+import { Table, Button, Popconfirm, Space, Tag, message, Modal, Row, Col } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import ApplicationForm from '@/pages/application/components/ApplicationForm';
 import ApplicationDetail from '@/pages/application/components/ApplicationDetail';
+import ApplicationHistory from '@/pages/application/components/ApplicationHistory';
 import { Application, ApplicationStatus } from '@/services/application/app.types';
 
 export default function ApplicationPage() {
@@ -14,15 +15,32 @@ export default function ApplicationPage() {
     deleteApplication,
     updateApplication,
     bulkUpdateStatus,
-    addApplication, // Đảm bảo có hàm addApplication
+    addApplication,
   } = useModel('application.application');
 
   const [editingApp, setEditingApp] = useState<Application | null>(null);
   const [viewingApp, setViewingApp] = useState<Application | null>(null);
   const [formVisible, setFormVisible] = useState(false);
+  const [historyVisible, setHistoryVisible] = useState<boolean>(false);
+
+  const addHistory = (action: string, operator: string, reason?: string) => {
+    const histories = JSON.parse(localStorage.getItem('appHistories') || '[]');
+    histories.unshift({
+      id: `${Date.now()}`,
+      action,
+      operator,
+      reason,
+      timestamp: new Date().toISOString(),
+    });
+    localStorage.setItem('appHistories', JSON.stringify(histories));
+  };
 
   const handleDelete = (id: string) => {
-    deleteApplication(id);
+    const app = applications.find((a) => a.id === id);
+    if (app) {
+      deleteApplication(id);
+      addHistory(`Xoá đơn ${app.fullName}`, 'Admin');
+    }
   };
 
   const handleEdit = (app: Application) => {
@@ -37,6 +55,7 @@ export default function ApplicationPage() {
   const handleApproveSelected = () => {
     if (selectedRowKeys.length === 0) return;
     bulkUpdateStatus(selectedRowKeys as string[], 'Approved');
+    addHistory(`Duyệt ${selectedRowKeys.length} đơn`, 'Admin');
     setSelectedRowKeys([]);
   };
 
@@ -47,6 +66,7 @@ export default function ApplicationPage() {
       content: 'Bạn có chắc chắn muốn từ chối các đơn này?',
       onOk() {
         bulkUpdateStatus(selectedRowKeys as string[], 'Rejected', 'Từ chối hàng loạt');
+        addHistory(`Từ chối ${selectedRowKeys.length} đơn`, 'Admin', 'Từ chối hàng loạt');
         setSelectedRowKeys([]);
       },
     });
@@ -109,16 +129,24 @@ export default function ApplicationPage() {
 
   return (
     <div>
-      <Space style={{ marginBottom: 16 }}>
-        <Button type="primary" onClick={() => { 
-          setEditingApp(null); 
-          setFormVisible(true); 
-        }}>
-          Thêm đơn
-        </Button>        
-        <Button onClick={handleApproveSelected}>Duyệt {selectedRowKeys.length} đơn</Button>
-        <Button danger onClick={handleRejectSelected}>Từ chối {selectedRowKeys.length} đơn</Button>
-      </Space>
+      <Row justify="space-between" style={{ marginBottom: 16 }}>
+        <Col>
+          <Space>
+            <Button type="primary" onClick={() => { 
+              setEditingApp(null); 
+              setFormVisible(true); 
+            }}>
+              Thêm đơn
+            </Button>        
+            <Button onClick={handleApproveSelected}>Duyệt {selectedRowKeys.length} đơn</Button>
+            <Button danger onClick={handleRejectSelected}>Từ chối {selectedRowKeys.length} đơn</Button>
+          </Space>
+        </Col>
+        <Col>
+          <Button onClick={() => setHistoryVisible(true)}>Xem lịch sử thao tác</Button>
+        </Col>
+      </Row>
+
       <Table
         rowKey="id"
         dataSource={applications}
@@ -131,23 +159,37 @@ export default function ApplicationPage() {
       />
 
       <ApplicationForm
-        visible={formVisible}  // Sử dụng visible thay vì open
+        visible={formVisible}
         onCancel={() => setFormVisible(false)}
         onSubmit={(data) => {
           if (editingApp) {
             updateApplication(editingApp.id, data);
+            if (data.status === 'Approved') {
+              addHistory(`Duyệt đơn ${editingApp.fullName}`, 'Admin');
+            } else if (data.status === 'Rejected') {
+              addHistory(`Từ chối đơn ${editingApp.fullName}`, 'Admin', data.note || 'Không ghi lý do');
+            } else {
+              addHistory(`Cập nhật đơn ${editingApp.fullName}`, 'Admin');
+            }
           } else {
-            addApplication(data); // Gọi hàm addApplication để thêm đơn đăng ký
+            addApplication(data);
+            addHistory(`Thêm đơn ${data.fullName}`, 'Admin');
           }
-          setFormVisible(false);  // Đảm bảo đóng modal khi đã xử lý
-        }}
+          setFormVisible(false);
+        }}        
         initialValues={editingApp || undefined}
       />
 
       <ApplicationDetail
         application={viewingApp}
         onClose={() => setViewingApp(null)}
-        visible={!!viewingApp}  // Sử dụng visible thay vì open
+        visible={!!viewingApp}
+        addHistory={addHistory} // Truyền addHistory vào đây
+      />
+
+      <ApplicationHistory
+        visible={historyVisible}
+        onClose={() => setHistoryVisible(false)}
       />
     </div>
   );

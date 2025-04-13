@@ -5,9 +5,10 @@ import { useModel } from 'umi';
 interface Props { 
   application: Application; 
   onClose: () => void; 
+  addHistory: (action: string, operator: string, reason?: string) => void; // Nhận addHistory từ props
 }
 
-const ApplicationDetail: React.FC<Props> = ({ application, onClose }) => { 
+const ApplicationDetail: React.FC<Props> = ({ application, onClose, addHistory }) => { 
   const { updateStatus } = useModel('application.application');
 
   const handleAction = (status: 'Approved' | 'Rejected') => { 
@@ -15,6 +16,15 @@ const ApplicationDetail: React.FC<Props> = ({ application, onClose }) => {
       message.error('Không có đơn đăng ký để xử lý!');
       return;
     }
+  
+    const actionMessage = status === 'Approved' ? 'Duyệt' : 'Từ chối';
+  
+    // Ghi lại hành động vào lịch sử
+    addHistory(
+      `${actionMessage} đơn ${application.fullName}`,
+      'Admin',
+      status === 'Rejected' ? application.note || 'Không ghi lý do' : undefined
+    );
   
     if (status === 'Rejected') { 
       Modal.confirm({ 
@@ -35,8 +45,9 @@ const ApplicationDetail: React.FC<Props> = ({ application, onClose }) => {
       updateStatus(application.id, status); 
       message.success('Đã cập nhật đơn'); 
       onClose(); 
-    } 
+    }
   };
+  
   
 
   return ( 

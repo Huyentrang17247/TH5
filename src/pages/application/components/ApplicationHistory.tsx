@@ -1,40 +1,32 @@
-import { Modal, Timeline } from 'antd';
-import { useModel } from 'umi';
-import type { ApplicationHistory } from '@/services/application/app.types';
+import { Modal, Table } from 'antd';
+import type { FC } from 'react';
 
 interface Props {
   visible: boolean;
   onClose: () => void;
-  id: string;
 }
 
-const ApplicationHistory: React.FC<Props> = ({ visible, onClose, id }) => {
-  const { histories }: { histories: ApplicationHistory[] } = useModel('application.application');
+const ApplicationHistory: FC<Props> = ({ visible, onClose }) => {
+  const history = JSON.parse(localStorage.getItem('appHistories') || '[]');
 
-  // Lọc lịch sử theo ID
-  const list: ApplicationHistory[] = Array.isArray(histories)
-    ? histories.filter((h) => h.applicationId === id)
-    : [];
+  const columns = [
+    { title: 'Hành động', dataIndex: 'action' },
+    { title: 'Người thực hiện', dataIndex: 'operator' },
+    { 
+      title: 'Thời gian', 
+      dataIndex: 'timestamp',
+      render: (text: string) => new Date(text).toLocaleString()
+    },
+  ];
 
   return (
-    <Modal
-      visible={visible}
-      title="Lịch sử thao tác"
-      onCancel={onClose}
-      onOk={onClose}
-      footer={null}
-    >
-      <Timeline>
-        {list.length > 0 ? (
-          list.map((entry, index) => (
-            <Timeline.Item key={index}>
-              {`${entry.timestamp ?? 'Không rõ thời gian'} - ${entry.action ?? 'Không rõ hành động'}`}
-            </Timeline.Item>
-          ))
-        ) : (
-          <Timeline.Item>Không có lịch sử nào</Timeline.Item>
-        )}
-      </Timeline>
+    <Modal visible={visible} onCancel={onClose} onOk={onClose} title="Lịch sử thao tác" width={700}>
+      <Table
+        columns={columns}
+        dataSource={history}
+        rowKey="id"
+        pagination={{ pageSize: 5 }}
+      />
     </Modal>
   );
 };

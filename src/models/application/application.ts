@@ -1,7 +1,17 @@
 import { useState } from 'react'; 
-import { Application, ApplicationHistory, ApplicationStatus, ApplicationForm } from '@/services/application/app.types'; 
+import { Application, ApplicationStatus, ApplicationForm, ApplicationHistory } from '@/services/application/app.types'; 
 import { message } from 'antd'; 
 import { getLocalApplications, saveLocalApplications, getApplicationHistory, saveApplicationHistory } from '@/services/application';
+
+function formatVNTime(date: string | Date) {
+  const d = new Date(date);
+  const hours = d.getHours().toString().padStart(2, '0');
+  const minutes = d.getMinutes().toString().padStart(2, '0');
+  const day = d.getDate().toString().padStart(2, '0');
+  const month = (d.getMonth() + 1).toString().padStart(2, '0');
+  const year = d.getFullYear();
+  return `${hours}h${minutes} ${day}/${month}/${year}`;
+}
 
 export default function useApplicationModel() {
   const [applications, setApplications] = useState<Application[]>(getLocalApplications());
@@ -11,6 +21,22 @@ export default function useApplicationModel() {
   const refresh = () => {
     setApplications(getLocalApplications());
     setHistories(getApplicationHistory());
+  };
+
+  const recordHistory = (applicationId: string, action: string, reason?: string) => {
+    const time = formatVNTime(new Date());
+    const description = reason
+      ? `Admin đã ${action} vào lúc ${time} với lý do: ${reason}`
+      : `Admin đã ${action} vào lúc ${time}`;
+    const newLog: ApplicationHistory = {
+      id: crypto.randomUUID(),
+      applicationId,
+      description,
+      timestamp: new Date().toISOString(),
+    };
+    const newHistories = [...histories, newLog];
+    saveApplicationHistory(newHistories);
+    setHistories(newHistories);
   };
 
   const addApplication = (data: ApplicationForm) => {
@@ -24,6 +50,8 @@ export default function useApplicationModel() {
     saveLocalApplications(newList);
     setApplications(newList);
     message.success('Thêm đơn đăng ký thành công!');
+
+    recordHistory(newApp.id, 'tạo đơn đăng ký');
   };
 
   const updateApplication = (id: string, data: Partial<Application>) => {
@@ -33,6 +61,8 @@ export default function useApplicationModel() {
     saveLocalApplications(updatedList);
     setApplications(updatedList);
     message.success('Cập nhật đơn đăng ký thành công!');
+
+    recordHistory(id, 'cập nhật đơn đăng ký');
   };
 
   const deleteApplication = (id: string) => {
@@ -40,6 +70,7 @@ export default function useApplicationModel() {
     saveLocalApplications(filtered);
     setApplications(filtered);
     message.success('Xoá đơn đăng ký thành công!');
+    // Không ghi log khi xóa
   };
 
   const updateStatus = (id: string, status: ApplicationStatus, reason?: string) => {
@@ -49,16 +80,7 @@ export default function useApplicationModel() {
     saveLocalApplications(updatedList);
     setApplications(updatedList);
 
-    const newHistory: ApplicationHistory = {
-      id: crypto.randomUUID(),
-      applicationId: id,
-      action: status,
-      reason,
-      timestamp: new Date().toISOString(),
-    };
-    const newHistories = [...histories, newHistory];
-    saveApplicationHistory(newHistories);
-    setHistories(newHistories);
+    recordHistory(id, status, reason);
   };
 
   const bulkUpdateStatus = (ids: string[], status: ApplicationStatus, reason?: string) => {
@@ -73,10 +95,12 @@ export default function useApplicationModel() {
     const newHistories: ApplicationHistory[] = ids.map((id) => ({
       id: crypto.randomUUID(),
       applicationId: id,
-      action: status,
-      reason,
+      description: reason
+        ? `Admin đã ${status} vào lúc ${formatVNTime(new Date())} với lý do: ${reason}`
+        : `Admin đã ${status} vào lúc ${formatVNTime(new Date())}`,
       timestamp: new Date().toISOString(),
     }));
+
     const merged = [...histories, ...newHistories];
     saveApplicationHistory(merged);
     setHistories(merged);

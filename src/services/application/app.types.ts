@@ -31,6 +31,7 @@ export interface ApplicationHistory {
   action: ApplicationStatus; 
   reason?: string; 
   timestamp: string; 
+  description: string;
 }
 
 export interface Club {
